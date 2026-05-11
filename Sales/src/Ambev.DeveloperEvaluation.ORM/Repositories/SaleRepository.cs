@@ -37,6 +37,36 @@ public class SaleRepository : ISaleRepository
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
     }
 
+    public async Task<Sale?> GetBySaleNumberAsync(int saleNumber, CancellationToken cancellationToken = default)
+    {
+        return await _context.Sales
+            .Include(s => s.Items)
+            .FirstOrDefaultAsync(s => s.SaleNumber == saleNumber, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Sale>> ListAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        if (page < 1)
+            page = 1;
+        if (pageSize < 1)
+            pageSize = 20;
+        if (pageSize > 100)
+            pageSize = 100;
+
+        return await _context.Sales
+            .Include(s => s.Items)
+            .OrderByDescending(s => s.SaleDate)
+            .ThenByDescending(s => s.SaleNumber)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Sales.CountAsync(cancellationToken);
+    }
+
     public async Task<Sale?> UpdateAsync(Sale sale, CancellationToken cancellationToken = default)
     {
         var existing = await _context.Sales

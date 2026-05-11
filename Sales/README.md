@@ -83,3 +83,4 @@ See [Project Structure](/.doc/project-structure.md)
 - Tests: `dotnet test Sales.sln -c Release`
 - Apply EF migrations (PostgreSQL, connection string in `src/Ambev.DeveloperEvaluation.WebApi/appsettings.json`):  
   `dotnet ef database update --project src/Ambev.DeveloperEvaluation.ORM --startup-project src/Ambev.DeveloperEvaluation.WebApi`
+- Sales application (MediatR): `CreateSaleCommand`, `GetSaleCommand`, `ListSalesQuery` (page/page size 1–100), `UpdateSaleCommand`, `DeleteSaleCommand` — totals and line discounts use `ISaleLineDiscountCalculator`.
