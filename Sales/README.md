@@ -79,6 +79,5 @@ See [Project Structure](/.doc/project-structure.md)
 ## Local development (backend in this folder)
 
 - Open and build [`Sales.sln`](Sales.sln) at the root of this folder; source is under [`src/`](src/) and tests under [`tests/`](tests/).
-- NuGet restore uses the public gallery via [`nuget.config`](nuget.config) so packages resolve without a private feed.
 - Build: `dotnet build Sales.sln -c Release`
 - Tests: `dotnet test Sales.sln -c Release`
