@@ -81,3 +81,5 @@ See [Project Structure](/.doc/project-structure.md)
 - Open and build [`Sales.sln`](Sales.sln) at the root of this folder; source is under [`src/`](src/) and tests under [`tests/`](tests/).
 - Build: `dotnet build Sales.sln -c Release`
 - Tests: `dotnet test Sales.sln -c Release`
+- Apply EF migrations (PostgreSQL, connection string in `src/Ambev.DeveloperEvaluation.WebApi/appsettings.json`):  
+  `dotnet ef database update --project src/Ambev.DeveloperEvaluation.ORM --startup-project src/Ambev.DeveloperEvaluation.WebApi`
