@@ -84,3 +84,14 @@ See [Project Structure](/.doc/project-structure.md)
 - Apply EF migrations (PostgreSQL, connection string in `src/Ambev.DeveloperEvaluation.WebApi/appsettings.json`):  
   `dotnet ef database update --project src/Ambev.DeveloperEvaluation.ORM --startup-project src/Ambev.DeveloperEvaluation.WebApi`
 - Sales application (MediatR): `CreateSaleCommand`, `GetSaleCommand`, `ListSalesQuery` (page/page size 1–100), `UpdateSaleCommand`, `DeleteSaleCommand` — totals and line discounts use `ISaleLineDiscountCalculator`.
+- Run API (Development): `dotnet run --project src/Ambev.DeveloperEvaluation.WebApi/Ambev.DeveloperEvaluation.WebApi.csproj` then open Swagger at `/swagger` (see `launchSettings.json` for ports).
+
+**Sales HTTP API** (`SalesController`):
+
+| Method | Route | Description |
+|--------|--------|-------------|
+| `POST` | `/api/sales` | Create sale (body: sale header + `items[]`; discounts calculated server-side). |
+| `GET` | `/api/sales/{id}` | Get sale with line items. |
+| `GET` | `/api/sales?page=1&pageSize=20` | List sales (paginated). |
+| `PUT` | `/api/sales/{id}` | Update sale (same body shape as create). |
+| `DELETE` | `/api/sales/{id}` | Delete sale. |
