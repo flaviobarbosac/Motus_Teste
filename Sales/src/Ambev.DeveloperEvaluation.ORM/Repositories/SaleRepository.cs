@@ -1,3 +1,4 @@
+using Ambev.DeveloperEvaluation.Domain;
 using Ambev.DeveloperEvaluation.Domain.Entities;
 using Ambev.DeveloperEvaluation.Domain.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -49,9 +50,9 @@ public class SaleRepository : ISaleRepository
         if (page < 1)
             page = 1;
         if (pageSize < 1)
-            pageSize = 20;
-        if (pageSize > 100)
-            pageSize = 100;
+            pageSize = SalesListPagination.DefaultPageSize;
+        if (pageSize > SalesListPagination.MaxPageSize)
+            pageSize = SalesListPagination.MaxPageSize;
 
         return await _context.Sales
             .Include(s => s.Items)
@@ -69,44 +70,58 @@ public class SaleRepository : ISaleRepository
 
     public async Task<Sale?> UpdateAsync(Sale sale, CancellationToken cancellationToken = default)
     {
-        var existing = await _context.Sales
-            .Include(s => s.Items)
-            .FirstOrDefaultAsync(s => s.Id == sale.Id, cancellationToken);
-
-        if (existing is null)
-            return null;
-
-        existing.SaleNumber = sale.SaleNumber;
-        existing.SaleDate = sale.SaleDate;
-        existing.CustomerId = sale.CustomerId;
-        existing.CustomerName = sale.CustomerName;
-        existing.BranchId = sale.BranchId;
-        existing.BranchName = sale.BranchName;
-        existing.TotalAmount = sale.TotalAmount;
-        existing.IsCancelled = sale.IsCancelled;
-
-        _context.SaleItems.RemoveRange(existing.Items);
-        existing.Items.Clear();
-
-        foreach (var item in sale.Items)
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        try
         {
-            var newId = item.Id == Guid.Empty ? Guid.NewGuid() : item.Id;
-            existing.Items.Add(new SaleItem
-            {
-                Id = newId,
-                SaleId = existing.Id,
-                ProductId = item.ProductId,
-                ProductDescription = item.ProductDescription,
-                Quantity = item.Quantity,
-                UnitPrice = item.UnitPrice,
-                DiscountAmount = item.DiscountAmount,
-                LineTotal = item.LineTotal,
-                IsCancelled = item.IsCancelled
-            });
-        }
+            var existing = await _context.Sales
+                .FirstOrDefaultAsync(s => s.Id == sale.Id, cancellationToken);
 
-        await _context.SaveChangesAsync(cancellationToken);
-        return existing;
+            if (existing is null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return null;
+            }
+
+            await _context.SaleItems
+                .Where(i => i.SaleId == sale.Id)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            existing.SaleNumber = sale.SaleNumber;
+            existing.SaleDate = sale.SaleDate;
+            existing.CustomerId = sale.CustomerId;
+            existing.CustomerName = sale.CustomerName;
+            existing.BranchId = sale.BranchId;
+            existing.BranchName = sale.BranchName;
+            existing.TotalAmount = sale.TotalAmount;
+            existing.IsCancelled = sale.IsCancelled;
+
+            foreach (var item in sale.Items)
+            {
+                var newId = item.Id == Guid.Empty ? Guid.NewGuid() : item.Id;
+                await _context.SaleItems.AddAsync(new SaleItem
+                {
+                    Id = newId,
+                    SaleId = existing.Id,
+                    ProductId = item.ProductId,
+                    ProductDescription = item.ProductDescription,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice,
+                    DiscountAmount = item.DiscountAmount,
+                    LineTotal = item.LineTotal,
+                    IsCancelled = item.IsCancelled
+                }, cancellationToken);
+            }
+
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            return await GetByIdAsync(sale.Id, cancellationToken);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)

@@ -5,9 +5,11 @@ using Ambev.DeveloperEvaluation.WebApi.Common;
 using Ambev.DeveloperEvaluation.WebApi.Features.Users.CreateUser;
 using Ambev.DeveloperEvaluation.WebApi.Features.Users.GetUser;
 using Ambev.DeveloperEvaluation.WebApi.Features.Users.DeleteUser;
+using Ambev.DeveloperEvaluation.WebApi.Features.Users.ListUsers;
 using Ambev.DeveloperEvaluation.Application.Users.CreateUser;
 using Ambev.DeveloperEvaluation.Application.Users.GetUser;
 using Ambev.DeveloperEvaluation.Application.Users.DeleteUser;
+using Ambev.DeveloperEvaluation.Application.Users.ListUsers;
 
 namespace Ambev.DeveloperEvaluation.WebApi.Features.Users;
 
@@ -61,6 +63,25 @@ public class UsersController : BaseController
     }
 
     /// <summary>
+    /// Lists users with pagination (page size max 100).
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(PaginatedResponse<GetUserResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ListUsers([FromQuery] ListUsersQueryRequest query, CancellationToken cancellationToken)
+    {
+        var validator = new ListUsersQueryRequestValidator();
+        var validationResult = await validator.ValidateAsync(query, cancellationToken);
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult.Errors);
+
+        var result = await _mediator.Send(new ListUsersQuery { Page = query.Page, PageSize = query.PageSize }, cancellationToken);
+        var items = _mapper.Map<List<GetUserResponse>>(result.Items);
+        var paged = new PaginatedList<GetUserResponse>(items, result.TotalCount, result.Page, result.PageSize);
+        return OkPaginated(paged);
+    }
+
+    /// <summary>
     /// Retrieves a user by their ID
     /// </summary>
     /// <param name="id">The unique identifier of the user</param>
@@ -82,7 +103,7 @@ public class UsersController : BaseController
         var command = _mapper.Map<GetUserCommand>(request.Id);
         var response = await _mediator.Send(command, cancellationToken);
 
-        return Ok(new ApiResponseWithData<GetUserResponse>
+        return OkRaw(new ApiResponseWithData<GetUserResponse>
         {
             Success = true,
             Message = "User retrieved successfully",
@@ -112,7 +133,7 @@ public class UsersController : BaseController
         var command = _mapper.Map<DeleteUserCommand>(request.Id);
         await _mediator.Send(command, cancellationToken);
 
-        return Ok(new ApiResponse
+        return OkRaw(new ApiResponse
         {
             Success = true,
             Message = "User deleted successfully"

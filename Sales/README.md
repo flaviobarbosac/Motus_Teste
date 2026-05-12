@@ -81,7 +81,11 @@ See [Project Structure](/.doc/project-structure.md)
 - Open and build [`Sales.sln`](Sales.sln) at the root of this folder; source is under [`src/`](src/) and tests under [`tests/`](tests/).
 - Build: `dotnet build Sales.sln -c Release`
 - Tests: `dotnet test Sales.sln -c Release`
-- Apply EF migrations (PostgreSQL, connection string in `src/Ambev.DeveloperEvaluation.WebApi/appsettings.json`):  
+- PostgreSQL local (exemplo com Docker Desktop):  
+  `docker run --name meu-postgres -e POSTGRES_PASSWORD=suasenha -p 5432:5432 -d postgres`  
+  Utilizador e base por omissão da imagem: `postgres` / `postgres`. A connection string em `appsettings.json` e `appsettings.Development.json` aponta para `localhost:5432` com essas credenciais. Para outra base, use `-e POSTGRES_DB=nome_da_base` e alinhe `Database=` na connection string.  
+  Alternativa do repositório: `docker compose up -d ambev.developerevaluation.database` (credenciais no `docker-compose.yml`).
+- Apply EF migrations (PostgreSQL):  
   `dotnet ef database update --project src/Ambev.DeveloperEvaluation.ORM --startup-project src/Ambev.DeveloperEvaluation.WebApi`
 - Sales application (MediatR): `CreateSaleCommand`, `GetSaleCommand`, `ListSalesQuery` (page/page size 1–100), `UpdateSaleCommand`, `DeleteSaleCommand` — totals and line discounts use `ISaleLineDiscountCalculator`.
 - Run API (Development): `dotnet run --project src/Ambev.DeveloperEvaluation.WebApi/Ambev.DeveloperEvaluation.WebApi.csproj` then open Swagger at `/swagger` (see `launchSettings.json` for ports).

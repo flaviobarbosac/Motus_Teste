@@ -84,7 +84,7 @@ public class SalesController : BaseController
         try
         {
             var result = await _mediator.Send(new GetSaleCommand(id), cancellationToken);
-            return Ok(new ApiResponseWithData<GetSaleResponse>
+            return OkRaw(new ApiResponseWithData<GetSaleResponse>
             {
                 Success = true,
                 Message = "Sale retrieved successfully",
@@ -98,7 +98,7 @@ public class SalesController : BaseController
     }
 
     /// <summary>
-    /// Lists sales with pagination (page size max 100).
+    /// Lista vendas com paginação. Sem query string usa page=1 e pageSize=1000; máximo pageSize=10000. Use page para percorrer o restante.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResponse<GetSaleResponse>), StatusCodes.Status200OK)]
@@ -137,7 +137,7 @@ public class SalesController : BaseController
         try
         {
             var result = await _mediator.Send(command, cancellationToken);
-            return Ok(new ApiResponseWithData<GetSaleResponse>
+            return OkRaw(new ApiResponseWithData<GetSaleResponse>
             {
                 Success = true,
                 Message = "Sale updated successfully",
@@ -176,7 +176,7 @@ public class SalesController : BaseController
         try
         {
             await _mediator.Send(new DeleteSaleCommand(id), cancellationToken);
-            return Ok(new ApiResponse
+            return OkRaw(new ApiResponse
             {
                 Success = true,
                 Message = "Sale deleted successfully"

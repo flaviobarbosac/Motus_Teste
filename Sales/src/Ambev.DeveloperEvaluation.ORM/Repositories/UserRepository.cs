@@ -28,6 +28,9 @@ public class UserRepository : IUserRepository
     /// <returns>The created user</returns>
     public async Task<User> CreateAsync(User user, CancellationToken cancellationToken = default)
     {
+        if (user.Id == Guid.Empty)
+            user.Id = Guid.NewGuid();
+
         await _context.Users.AddAsync(user, cancellationToken);
         await _context.SaveChangesAsync(cancellationToken);
         return user;
@@ -71,5 +74,30 @@ public class UserRepository : IUserRepository
         _context.Users.Remove(user);
         await _context.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> CountAsync(CancellationToken cancellationToken = default)
+    {
+        return await _context.Users.CountAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<User>> ListAsync(int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        if (page < 1)
+            page = 1;
+        if (pageSize < 1)
+            pageSize = 20;
+        if (pageSize > 100)
+            pageSize = 100;
+
+        return await _context.Users
+            .AsNoTracking()
+            .OrderByDescending(u => u.CreatedAt)
+            .ThenBy(u => u.Email)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
     }
 }

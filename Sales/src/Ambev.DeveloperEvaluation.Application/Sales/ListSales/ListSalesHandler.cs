@@ -1,4 +1,5 @@
 using Ambev.DeveloperEvaluation.Application.Sales.GetSale;
+using Ambev.DeveloperEvaluation.Domain;
 using Ambev.DeveloperEvaluation.Domain.Repositories;
 using AutoMapper;
 using FluentValidation;
@@ -24,13 +25,14 @@ public class ListSalesHandler : IRequestHandler<ListSalesQuery, ListSalesResult>
         if (!validationResult.IsValid)
             throw new ValidationException(validationResult.Errors);
 
+        var pageSize = Math.Clamp(request.PageSize, 1, SalesListPagination.MaxPageSize);
         var total = await _saleRepository.CountAsync(cancellationToken);
-        var sales = await _saleRepository.ListAsync(request.Page, request.PageSize, cancellationToken);
+        var sales = await _saleRepository.ListAsync(request.Page, pageSize, cancellationToken);
 
         return new ListSalesResult
         {
             Page = request.Page,
-            PageSize = request.PageSize,
+            PageSize = pageSize,
             TotalCount = total,
             Items = _mapper.Map<IList<GetSaleResult>>(sales)
         };

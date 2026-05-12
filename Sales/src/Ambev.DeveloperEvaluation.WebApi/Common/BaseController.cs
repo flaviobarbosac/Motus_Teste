@@ -16,6 +16,9 @@ public class BaseController : ControllerBase
     protected IActionResult Ok<T>(T data) =>
             base.Ok(new ApiResponseWithData<T> { Data = data, Success = true });
 
+    /// <summary>HTTP 200 com o corpo exatamente como o objeto informado (sem novo envelope <see cref="ApiResponseWithData{T}"/>).</summary>
+    protected IActionResult OkRaw(object value) => base.Ok(value);
+
     protected IActionResult Created<T>(string routeName, object routeValues, T data) =>
         base.CreatedAtRoute(routeName, routeValues, new ApiResponseWithData<T> { Data = data, Success = true });
 
@@ -26,7 +29,7 @@ public class BaseController : ControllerBase
         base.NotFound(new ApiResponse { Message = message, Success = false });
 
     protected IActionResult OkPaginated<T>(PaginatedList<T> pagedList) =>
-            Ok(new PaginatedResponse<T>
+            base.Ok(new PaginatedResponse<T>
             {
                 Data = pagedList,
                 CurrentPage = pagedList.CurrentPage,

@@ -1,45 +1,43 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.IdentityModel.Tokens;
-using System;
-using System.Text;
+using Microsoft.Extensions.Options;
 
-namespace Ambev.DeveloperEvaluation.Common.Security
+namespace Ambev.DeveloperEvaluation.Common.Security;
+
+public static class AuthenticationExtension
 {
-    public static class AuthenticationExtension
+    public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
     {
-        public static IServiceCollection AddJwtAuthentication(this IServiceCollection services, IConfiguration configuration)
-        {
-            services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
-
-            var secretKey = configuration["Jwt:SecretKey"]?.ToString();
-            ArgumentException.ThrowIfNullOrWhiteSpace(secretKey);
-
-            var key = Encoding.ASCII.GetBytes(secretKey);
-
-            services.AddAuthentication(x =>
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .PostConfigure(o =>
             {
-                x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-                x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                o.SecretKey = o.SecretKey.Trim();
+                o.Issuer = o.Issuer.Trim();
+                o.Audience = o.Audience.Trim();
             })
-            .AddJwtBearer(x =>
+            .Validate(
+                o => o.SecretKey.Length >= JwtTokenParametersFactory.MinimumSecretKeyLength,
+                $"Jwt:SecretKey must be at least {JwtTokenParametersFactory.MinimumSecretKeyLength} characters.")
+            .Validate(o => !string.IsNullOrEmpty(o.Issuer), "Jwt:Issuer is required.")
+            .Validate(o => !string.IsNullOrEmpty(o.Audience), "Jwt:Audience is required.")
+            .Validate(o => o.AccessTokenLifetimeHours is > 0 and <= 168, "Jwt:AccessTokenLifetimeHours must be between 1 and 168.")
+            .ValidateOnStart();
+
+        services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+
+        services.AddSingleton<IPostConfigureOptions<JwtBearerOptions>, JwtBearerPostConfigureOptions>();
+
+        services.AddAuthentication(o =>
             {
-                x.RequireHttpsMetadata = false;
-                x.SaveToken = true;
-                x.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = new SymmetricSecurityKey(key),
-                    ValidateIssuer = false,
-                    ValidateAudience = false,
-                    ClockSkew = TimeSpan.Zero
-                };
-            });
+                o.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, _ => { });
 
-            services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+        services.AddAuthorization();
 
-            return services;
-        }
+        return services;
     }
 }
