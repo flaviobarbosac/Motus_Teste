@@ -11,15 +11,20 @@ using Ambev.DeveloperEvaluation.WebApi.Features.Sales.GetSale;
 using Ambev.DeveloperEvaluation.WebApi.Features.Sales.ListSales;
 using AutoMapper;
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Ambev.DeveloperEvaluation.WebApi.Features.Sales;
 
 /// <summary>
-/// REST API for sale aggregate (CRUD).
+/// API REST de vendas: criação, consulta, listagem paginada, atualização e eliminação.
 /// </summary>
+/// <remarks>
+/// Requer JWT válido (exceto fluxo de autenticação noutros controladores). Descontos por linha e totais são calculados no servidor.
+/// </remarks>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class SalesController : BaseController
 {
     private readonly IMediator _mediator;
@@ -32,11 +37,16 @@ public class SalesController : BaseController
     }
 
     /// <summary>
-    /// Creates a new sale (line discounts and totals are calculated server-side).
+    /// Cria uma nova venda com linhas; descontos e total são calculados no servidor.
     /// </summary>
+    /// <param name="request">Cabeçalho da venda e linhas (produto, quantidade, preço unitário).</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>201 com identificador e total; 400 regra de negócio/validação; 409 número de venda duplicado.</returns>
+    /// <response code="401">JWT em falta ou inválido.</response>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponseWithData<CreateSaleResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Create([FromBody] CreateSaleRequest request, CancellationToken cancellationToken)
     {
@@ -67,11 +77,16 @@ public class SalesController : BaseController
     }
 
     /// <summary>
-    /// Gets a sale by identifier (includes line items).
+    /// Obtém uma venda pelo identificador, incluindo todas as linhas e totais.
     /// </summary>
+    /// <param name="id">Identificador único (GUID) da venda.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>200 com dados da venda; 404 se não existir.</returns>
+    /// <response code="401">JWT em falta ou inválido.</response>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ApiResponseWithData<GetSaleResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById([FromRoute] Guid id, CancellationToken cancellationToken)
     {
@@ -98,11 +113,16 @@ public class SalesController : BaseController
     }
 
     /// <summary>
-    /// Lista vendas com paginação. Sem query string usa page=1 e pageSize=1000; máximo pageSize=10000. Use page para percorrer o restante.
+    /// Lista vendas com paginação. Sem query string usa página 1 e tamanho de página por omissão do sistema; existe limite máximo por pedido.
     /// </summary>
+    /// <param name="query">Parâmetros <c>page</c> (≥ 1) e <c>pageSize</c> (intervalo permitido pela API).</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>200 com <c>data</c>, <c>totalCount</c>, <c>currentPage</c> e <c>totalPages</c>.</returns>
+    /// <response code="401">JWT em falta ou inválido.</response>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResponse<GetSaleResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> List([FromQuery] ListSalesQueryRequest query, CancellationToken cancellationToken)
     {
         var validator = new ListSalesQueryRequestValidator();
@@ -117,11 +137,17 @@ public class SalesController : BaseController
     }
 
     /// <summary>
-    /// Updates an existing sale (replaces line items; discounts recalculated).
+    /// Atualiza uma venda existente (substitui linhas; descontos e totais recalculados).
     /// </summary>
+    /// <param name="id">Identificador da venda a atualizar.</param>
+    /// <param name="request">Novo estado da venda (mesmo formato que na criação).</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>200 com venda atualizada; 404 não encontrada; 409 conflito de negócio.</returns>
+    /// <response code="401">JWT em falta ou inválido.</response>
     [HttpPut("{id:guid}")]
     [ProducesResponseType(typeof(ApiResponseWithData<GetSaleResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update([FromRoute] Guid id, [FromBody] CreateSaleRequest request, CancellationToken cancellationToken)
@@ -159,11 +185,16 @@ public class SalesController : BaseController
     }
 
     /// <summary>
-    /// Deletes a sale and its items.
+    /// Elimina uma venda e as respetivas linhas.
     /// </summary>
+    /// <param name="id">Identificador da venda a eliminar.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>200 em sucesso; 404 se a venda não existir.</returns>
+    /// <response code="401">JWT em falta ou inválido.</response>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete([FromRoute] Guid id, CancellationToken cancellationToken)
     {

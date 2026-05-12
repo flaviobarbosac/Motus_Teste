@@ -2,38 +2,24 @@ using Ambev.DeveloperEvaluation.Domain.Enums;
 
 namespace Ambev.DeveloperEvaluation.WebApi.Features.Users.GetUser;
 
-/// <summary>
-/// API response model for GetUser operation
-/// </summary>
+/// <summary>Perfil de utilizador devolvido pela API.</summary>
 public class GetUserResponse
 {
-    /// <summary>
-    /// The unique identifier of the user
-    /// </summary>
+    /// <summary>Identificador.</summary>
     public Guid Id { get; set; }
 
-    /// <summary>
-    /// The user's full name
-    /// </summary>
+    /// <summary>Nome de utilizador.</summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>
-    /// The user's email address
-    /// </summary>
+    /// <summary>Email.</summary>
     public string Email { get; set; } = string.Empty;
 
-    /// <summary>
-    /// The user's phone number
-    /// </summary>
+    /// <summary>Telefone.</summary>
     public string Phone { get; set; } = string.Empty;
 
-    /// <summary>
-    /// The user's role in the system
-    /// </summary>
+    /// <summary>Perfil.</summary>
     public UserRole Role { get; set; }
 
-    /// <summary>
-    /// The current status of the user
-    /// </summary>
+    /// <summary>Estado.</summary>
     public UserStatus Status { get; set; }
 }

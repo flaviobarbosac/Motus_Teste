@@ -22,5 +22,28 @@ internal sealed class JwtBearerPostConfigureOptions : IPostConfigureOptions<JwtB
         options.RequireHttpsMetadata = false;
         options.SaveToken = true;
         options.MapInboundClaims = true;
+
+        // O handler nativo só remove um "Bearer "; o Swagger UI já prefixa "Bearer ".
+        // Se o utilizador colar "Bearer eyJ..." no Authorize, o cabeçalho fica "Bearer Bearer eyJ..." → invalid_token.
+        options.Events ??= new JwtBearerEvents();
+        var priorMessageReceived = options.Events.OnMessageReceived;
+        options.Events.OnMessageReceived = async context =>
+        {
+            if (priorMessageReceived is not null)
+                await priorMessageReceived(context).ConfigureAwait(false);
+
+            if (!string.IsNullOrWhiteSpace(context.Token))
+            {
+                var fromToken = JwtBearerAuthorizationHeaderNormalizer.ExtractJwt(context.Token);
+                if (!string.IsNullOrWhiteSpace(fromToken))
+                    context.Token = fromToken;
+                return;
+            }
+
+            var extracted = JwtBearerAuthorizationHeaderNormalizer.ExtractJwt(
+                context.Request.Headers.Authorization.ToString());
+            if (!string.IsNullOrWhiteSpace(extracted))
+                context.Token = extracted;
+        };
     }
 }

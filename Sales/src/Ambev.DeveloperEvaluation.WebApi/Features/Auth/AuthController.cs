@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AutoMapper;
 using Ambev.DeveloperEvaluation.WebApi.Common;
@@ -8,20 +9,24 @@ using Ambev.DeveloperEvaluation.Application.Auth.AuthenticateUser;
 namespace Ambev.DeveloperEvaluation.WebApi.Features.Auth;
 
 /// <summary>
-/// Controller for authentication operations
+/// Autenticação: emissão de JWT para sessões autenticadas.
 /// </summary>
+/// <remarks>
+/// Não requer <c>Authorization</c>. Utilize o token devolvido nas restantes operações protegidas.
+/// </remarks>
 [ApiController]
 [Route("api/[controller]")]
+[AllowAnonymous]
 public class AuthController : BaseController
 {
     private readonly IMediator _mediator;
     private readonly IMapper _mapper;
 
     /// <summary>
-    /// Initializes a new instance of AuthController
+    /// Inicializa o controlador de autenticação.
     /// </summary>
-    /// <param name="mediator">The mediator instance</param>
-    /// <param name="mapper">The AutoMapper instance</param>
+    /// <param name="mediator">MediatR.</param>
+    /// <param name="mapper">Mapeamento API ↔ aplicação.</param>
     public AuthController(IMediator mediator, IMapper mapper)
     {
         _mediator = mediator;
@@ -29,11 +34,11 @@ public class AuthController : BaseController
     }
 
     /// <summary>
-    /// Authenticates a user with their credentials
+    /// Autentica um utilizador ativo com email e palavra-passe e devolve um JWT.
     /// </summary>
-    /// <param name="request">The authentication request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Authentication token if successful</returns>
+    /// <param name="request">Email e palavra-passe.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>200 com <c>data.token</c> (JWT), email, nome e perfil; 401 credenciais inválidas ou conta inativa.</returns>
     [HttpPost]
     [ProducesResponseType(typeof(ApiResponseWithData<AuthenticateUserResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]

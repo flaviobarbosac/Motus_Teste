@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Ambev.DeveloperEvaluation.Domain;
@@ -37,6 +38,34 @@ public class SalesEndpointsIntegrationTests : IClassFixture<SalesApiFactory>
 
     public SalesEndpointsIntegrationTests(SalesApiFactory factory) => _factory = factory;
 
+    private static async Task<HttpClient> CreateAuthenticatedClientAsync(SalesApiFactory factory, JsonSerializerOptions json)
+    {
+        await EnsureSchemaAsync(factory);
+        var client = factory.CreateClient();
+        var id = Guid.NewGuid().ToString("N");
+        var email = $"{id}@test.local";
+        var createUser = new
+        {
+            username = $"user{id}",
+            password = "Test@123",
+            phone = "+5511987654321",
+            email,
+            status = 1,
+            role = 1
+        };
+
+        var createRes = await client.PostAsJsonAsync("/api/users", createUser, json);
+        Assert.True(createRes.IsSuccessStatusCode, await createRes.Content.ReadAsStringAsync());
+
+        var authRes = await client.PostAsJsonAsync("/api/auth", new { email, password = "Test@123" }, json);
+        Assert.True(authRes.IsSuccessStatusCode, await authRes.Content.ReadAsStringAsync());
+        using var authDoc = JsonDocument.Parse(await authRes.Content.ReadAsStringAsync());
+        var token = authDoc.RootElement.Prop("data").Prop("token").GetString();
+        Assert.False(string.IsNullOrEmpty(token));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!);
+        return client;
+    }
+
     private static async Task<HttpClient> CreateApiClientAsync(SalesApiFactory factory)
     {
         await EnsureSchemaAsync(factory);
@@ -53,7 +82,7 @@ public class SalesEndpointsIntegrationTests : IClassFixture<SalesApiFactory>
     [Fact]
     public async Task Post_Get_List_Put_Delete_sales_endpoints_return_expected_statuses()
     {
-        var client = await CreateApiClientAsync(_factory);
+        var client = await CreateAuthenticatedClientAsync(_factory, _json);
         var saleNumber = Random.Shared.Next(900_000, 999_999);
         var customerId = Guid.NewGuid();
         var branchId = Guid.NewGuid();
@@ -125,7 +154,7 @@ public class SalesEndpointsIntegrationTests : IClassFixture<SalesApiFactory>
     [Fact]
     public async Task Post_duplicate_sale_number_returns_409()
     {
-        var client = await CreateApiClientAsync(_factory);
+        var client = await CreateAuthenticatedClientAsync(_factory, _json);
         var saleNumber = Random.Shared.Next(800_000, 899_999);
         var body = new
         {
@@ -147,9 +176,44 @@ public class SalesEndpointsIntegrationTests : IClassFixture<SalesApiFactory>
     }
 
     [Fact]
-    public async Task Get_sales_list_without_token_returns_ok()
+    public async Task Get_sales_list_without_token_returns_unauthorized()
     {
         var client = await CreateApiClientAsync(_factory);
+        var response = await client.GetAsync("/api/sales?page=1&pageSize=10");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_sales_list_with_Bearer_Bearer_prefix_returns_ok_like_swagger_paste()
+    {
+        await EnsureSchemaAsync(_factory);
+        var client = _factory.CreateClient();
+        var id = Guid.NewGuid().ToString("N");
+        var email = $"{id}@test.local";
+        var createUser = new
+        {
+            username = $"user{id}",
+            password = "Test@123",
+            phone = "+5511987654321",
+            email,
+            status = 1,
+            role = 1
+        };
+
+        var createRes = await client.PostAsJsonAsync("/api/users", createUser, _json);
+        Assert.True(createRes.IsSuccessStatusCode, await createRes.Content.ReadAsStringAsync());
+
+        var authRes = await client.PostAsJsonAsync("/api/auth", new { email, password = "Test@123" }, _json);
+        Assert.True(authRes.IsSuccessStatusCode, await authRes.Content.ReadAsStringAsync());
+        using var authDoc = JsonDocument.Parse(await authRes.Content.ReadAsStringAsync());
+        var token = authDoc.RootElement.Prop("data").Prop("token").GetString();
+        Assert.False(string.IsNullOrEmpty(token));
+
+        client.DefaultRequestHeaders.Remove("Authorization");
+        Assert.True(client.DefaultRequestHeaders.TryAddWithoutValidation(
+            "Authorization",
+            "Bearer Bearer " + token));
+
         var response = await client.GetAsync("/api/sales?page=1&pageSize=10");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -157,7 +221,7 @@ public class SalesEndpointsIntegrationTests : IClassFixture<SalesApiFactory>
     [Fact]
     public async Task Get_users_route_casing_returns_200()
     {
-        var client = await CreateApiClientAsync(_factory);
+        var client = await CreateAuthenticatedClientAsync(_factory, _json);
         var lower = await client.GetAsync("/api/users?page=1&pageSize=10");
         var mixed = await client.GetAsync("/api/Users?page=1&pageSize=10");
         Assert.Equal(HttpStatusCode.OK, lower.StatusCode);
@@ -167,7 +231,7 @@ public class SalesEndpointsIntegrationTests : IClassFixture<SalesApiFactory>
     [Fact]
     public async Task Get_sales_without_query_returns_first_page_with_default_page_size_and_correct_total_count()
     {
-        var client = await CreateApiClientAsync(_factory);
+        var client = await CreateAuthenticatedClientAsync(_factory, _json);
         var beforeJson = await (await client.GetAsync("/api/sales?pageSize=10000&page=1")).Content.ReadAsStringAsync();
         using var beforeDoc = JsonDocument.Parse(beforeJson);
         var beforeTotal = beforeDoc.RootElement.Prop("totalCount").GetInt32();

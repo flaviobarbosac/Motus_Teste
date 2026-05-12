@@ -38,4 +38,15 @@
 		<ProjectReference Include="..\..\src\Ambev.DeveloperEvaluation.ORM\Ambev.DeveloperEvaluation.ORM.csproj" />
 	</ItemGroup>
 
+	<!-- Cobertura mínima de linhas (Domain + Application): dotnet test -p:RunCoverageAnalysis=true -->
+	<PropertyGroup Condition="'$(RunCoverageAnalysis)' == 'true'">
+		<CollectCoverage>true</CollectCoverage>
+		<CoverletOutput>$(MSBuildProjectDirectory)/TestResults/coverage.analysis.json</CoverletOutput>
+		<CoverletOutputFormat>json</CoverletOutputFormat>
+		<Include>[Ambev.DeveloperEvaluation.Domain]*,[Ambev.DeveloperEvaluation.Application]*</Include>
+		<Threshold>81</Threshold>
+		<ThresholdType>line</ThresholdType>
+		<ThresholdStat>total</ThresholdStat>
+	</PropertyGroup>
+
 </Project>

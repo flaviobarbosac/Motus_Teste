@@ -1,29 +1,19 @@
-using System;
-
 namespace Ambev.DeveloperEvaluation.WebApi.Features.Auth.AuthenticateUserFeature;
 
 /// <summary>
-/// Represents the response returned after user authentication
+/// Dados devolvidos após login bem-sucedido; inclui o JWT em <see cref="Token"/>.
 /// </summary>
 public sealed class AuthenticateUserResponse
 {
-    /// <summary>
-    /// Gets or sets the JWT token for authenticated user
-    /// </summary>
+    /// <summary>JWT para o cabeçalho <c>Authorization: Bearer</c>.</summary>
     public string Token { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Gets or sets the user's email address
-    /// </summary>
-    public string Email { get; set; } = string.Empty;   
+    /// <summary>Email do utilizador autenticado.</summary>
+    public string Email { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Gets or sets the user's full name
-    /// </summary>
+    /// <summary>Nome de utilizador.</summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Gets or sets the user's role in the system
-    /// </summary>
+    /// <summary>Perfil (texto), alinhado com a enumeração de domínio.</summary>
     public string Role { get; set; } = string.Empty;
 }

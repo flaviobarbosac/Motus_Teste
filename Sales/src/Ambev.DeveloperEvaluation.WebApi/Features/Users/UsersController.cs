@@ -1,4 +1,5 @@
 ﻿using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AutoMapper;
 using Ambev.DeveloperEvaluation.WebApi.Common;
@@ -14,20 +15,24 @@ using Ambev.DeveloperEvaluation.Application.Users.ListUsers;
 namespace Ambev.DeveloperEvaluation.WebApi.Features.Users;
 
 /// <summary>
-/// Controller for managing user operations
+/// Gestão de utilizadores: registo, listagem, consulta e eliminação.
 /// </summary>
+/// <remarks>
+/// <c>POST /api/users</c> é anónimo (registo). Os restantes métodos exigem JWT.
+/// </remarks>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class UsersController : BaseController
 {
     private readonly IMediator _mediator;
     private readonly IMapper _mapper;
 
     /// <summary>
-    /// Initializes a new instance of UsersController
+    /// Inicializa o controlador de utilizadores.
     /// </summary>
-    /// <param name="mediator">The mediator instance</param>
-    /// <param name="mapper">The AutoMapper instance</param>
+    /// <param name="mediator">MediatR para comandos e consultas.</param>
+    /// <param name="mapper">Mapeamento entre modelos API e aplicação.</param>
     public UsersController(IMediator mediator, IMapper mapper)
     {
         _mediator = mediator;
@@ -35,12 +40,13 @@ public class UsersController : BaseController
     }
 
     /// <summary>
-    /// Creates a new user
+    /// Regista um novo utilizador (público; não envie cabeçalho Authorization).
     /// </summary>
-    /// <param name="request">The user creation request</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The created user details</returns>
+    /// <param name="request">Nome de utilizador, email, telefone, palavra-passe, estado e perfil.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>201 com dados do utilizador criado (sem palavra-passe).</returns>
     [HttpPost]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponseWithData<CreateUserResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request, CancellationToken cancellationToken)
@@ -63,11 +69,16 @@ public class UsersController : BaseController
     }
 
     /// <summary>
-    /// Lists users with pagination (page size max 100).
+    /// Lista utilizadores com paginação (tamanho de página limitado pela API).
     /// </summary>
+    /// <param name="query">Página e tamanho da página.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>200 com lista paginada.</returns>
+    /// <response code="401">JWT em falta ou inválido.</response>
     [HttpGet]
     [ProducesResponseType(typeof(PaginatedResponse<GetUserResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> ListUsers([FromQuery] ListUsersQueryRequest query, CancellationToken cancellationToken)
     {
         var validator = new ListUsersQueryRequestValidator();
@@ -82,14 +93,16 @@ public class UsersController : BaseController
     }
 
     /// <summary>
-    /// Retrieves a user by their ID
+    /// Obtém os dados de um utilizador pelo identificador.
     /// </summary>
-    /// <param name="id">The unique identifier of the user</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The user details if found</returns>
+    /// <param name="id">GUID do utilizador.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>200 com perfil; 404 se não existir.</returns>
+    /// <response code="401">JWT em falta ou inválido.</response>
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(ApiResponseWithData<GetUserResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUser([FromRoute] Guid id, CancellationToken cancellationToken)
     {
@@ -112,14 +125,16 @@ public class UsersController : BaseController
     }
 
     /// <summary>
-    /// Deletes a user by their ID
+    /// Elimina um utilizador pelo identificador.
     /// </summary>
-    /// <param name="id">The unique identifier of the user to delete</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Success response if the user was deleted</returns>
+    /// <param name="id">GUID do utilizador a eliminar.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <returns>200 em sucesso; 404 se não existir.</returns>
+    /// <response code="401">JWT em falta ou inválido.</response>
     [HttpDelete("{id}")]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteUser([FromRoute] Guid id, CancellationToken cancellationToken)
     {

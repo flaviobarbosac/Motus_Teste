@@ -3,37 +3,25 @@
 namespace Ambev.DeveloperEvaluation.WebApi.Features.Users.CreateUser;
 
 /// <summary>
-/// Represents a request to create a new user in the system.
+/// Pedido para criar utilizador (registo). Campos sujeitos a validação (email, telefone, complexidade da palavra-passe, etc.).
 /// </summary>
 public class CreateUserRequest
 {
-    /// <summary>
-    /// Gets or sets the username. Must be unique and contain only valid characters.
-    /// </summary>
+    /// <summary>Nome de utilizador único.</summary>
     public string Username { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Gets or sets the password. Must meet security requirements.
-    /// </summary>
+    /// <summary>Palavra-passe (requisitos mínimos definidos na API).</summary>
     public string Password { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Gets or sets the phone number in format (XX) XXXXX-XXXX.
-    /// </summary>
+    /// <summary>Telefone no formato esperado pela validação.</summary>
     public string Phone { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Gets or sets the email address. Must be a valid email format.
-    /// </summary>
+    /// <summary>Email único.</summary>
     public string Email { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Gets or sets the initial status of the user account.
-    /// </summary>
+    /// <summary>Estado inicial da conta.</summary>
     public UserStatus Status { get; set; }
 
-    /// <summary>
-    /// Gets or sets the role assigned to the user.
-    /// </summary>
+    /// <summary>Perfil (enumeração de domínio).</summary>
     public UserRole Role { get; set; }
 }
