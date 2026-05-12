@@ -1,4 +1,6 @@
 ﻿using Ambev.DeveloperEvaluation.Common.Security;
+using Ambev.DeveloperEvaluation.Domain.Events;
+using Ambev.DeveloperEvaluation.Application.Sales;
 using Ambev.DeveloperEvaluation.Domain.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,5 +13,6 @@ public class ApplicationModuleInitializer : IModuleInitializer
     {
         builder.Services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
         builder.Services.AddSingleton<ISaleLineDiscountCalculator, SaleLineDiscountCalculator>();
+        builder.Services.AddSingleton<ISaleLifecycleEvents, SaleLifecycleLogger>();
     }
 }

@@ -1,6 +1,7 @@
 using Ambev.DeveloperEvaluation.Application.Sales;
 using Ambev.DeveloperEvaluation.Application.Sales.CreateSale;
 using Ambev.DeveloperEvaluation.Domain.Entities;
+using Ambev.DeveloperEvaluation.Domain.Events;
 using Ambev.DeveloperEvaluation.Domain.Repositories;
 using Ambev.DeveloperEvaluation.Domain.Services;
 using AutoMapper;
@@ -23,11 +24,12 @@ public class CreateSaleHandlerTests
     public async Task Handle_ValidRequest_CallsRepositoryWithDiscountedTotal()
     {
         var repo = Substitute.For<ISaleRepository>();
+        var events = Substitute.For<ISaleLifecycleEvents>();
         repo.GetBySaleNumberAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns((Sale?)null);
         repo.CreateAsync(Arg.Any<Sale>(), Arg.Any<CancellationToken>())
             .Returns(ci => ci.Arg<Sale>());
 
-        var handler = new CreateSaleHandler(repo, new SaleLineDiscountCalculator(), CreateMapper());
+        var handler = new CreateSaleHandler(repo, new SaleLineDiscountCalculator(), events, CreateMapper());
 
         var command = new CreateSaleCommand
         {
@@ -57,16 +59,18 @@ public class CreateSaleHandlerTests
         await repo.Received(1).CreateAsync(
             Arg.Is<Sale>(s => s.TotalAmount == 360m && s.Items.Count == 1 && s.Items.First().DiscountAmount == 40m),
             Arg.Any<CancellationToken>());
+        events.Received(1).SaleCreated(Arg.Any<Guid>(), 1001, 360m, Arg.Any<DateTime>());
     }
 
     [Fact(DisplayName = "Create sale with duplicate sale number throws")]
     public async Task Handle_DuplicateSaleNumber_ThrowsInvalidOperationException()
     {
         var repo = Substitute.For<ISaleRepository>();
+        var events = Substitute.For<ISaleLifecycleEvents>();
         repo.GetBySaleNumberAsync(1, Arg.Any<CancellationToken>())
             .Returns(new Sale { Id = Guid.NewGuid(), SaleNumber = 1 });
 
-        var handler = new CreateSaleHandler(repo, new SaleLineDiscountCalculator(), CreateMapper());
+        var handler = new CreateSaleHandler(repo, new SaleLineDiscountCalculator(), events, CreateMapper());
         var command = new CreateSaleCommand
         {
             SaleNumber = 1,
@@ -83,13 +87,15 @@ public class CreateSaleHandlerTests
 
         var act = () => handler.Handle(command, CancellationToken.None);
         await act.Should().ThrowAsync<InvalidOperationException>();
+        events.DidNotReceive().SaleCreated(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<decimal>(), Arg.Any<DateTime>());
     }
 
     [Fact(DisplayName = "Create sale without items throws validation exception")]
     public async Task Handle_NoItems_ThrowsValidationException()
     {
         var repo = Substitute.For<ISaleRepository>();
-        var handler = new CreateSaleHandler(repo, new SaleLineDiscountCalculator(), CreateMapper());
+        var events = Substitute.For<ISaleLifecycleEvents>();
+        var handler = new CreateSaleHandler(repo, new SaleLineDiscountCalculator(), events, CreateMapper());
         var command = new CreateSaleCommand
         {
             SaleNumber = 2,
@@ -103,5 +109,35 @@ public class CreateSaleHandlerTests
 
         var act = () => handler.Handle(command, CancellationToken.None);
         await act.Should().ThrowAsync<FluentValidation.ValidationException>();
+    }
+
+    [Fact(DisplayName = "Create sale emits ItemCancelled for cancelled lines")]
+    public async Task Handle_ItemCancelled_LogsPerCancelledLine()
+    {
+        var repo = Substitute.For<ISaleRepository>();
+        var events = Substitute.For<ISaleLifecycleEvents>();
+        repo.GetBySaleNumberAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns((Sale?)null);
+        repo.CreateAsync(Arg.Any<Sale>(), Arg.Any<CancellationToken>()).Returns(ci => ci.Arg<Sale>());
+
+        var pid = Guid.NewGuid();
+        var handler = new CreateSaleHandler(repo, new SaleLineDiscountCalculator(), events, CreateMapper());
+        var command = new CreateSaleCommand
+        {
+            SaleNumber = 2002,
+            SaleDate = DateTime.UtcNow,
+            CustomerId = Guid.NewGuid(),
+            CustomerName = "c",
+            BranchId = Guid.NewGuid(),
+            BranchName = "b",
+            IsCancelled = false,
+            Items = new List<CreateSaleItemCommand>
+            {
+                new() { ProductId = pid, ProductDescription = "x", Quantity = 1, UnitPrice = 10m, IsCancelled = true }
+            }
+        };
+
+        await handler.Handle(command, CancellationToken.None);
+
+        events.Received(1).ItemCancelled(Arg.Any<Guid>(), pid, "x", 1, Arg.Any<DateTime>());
     }
 }

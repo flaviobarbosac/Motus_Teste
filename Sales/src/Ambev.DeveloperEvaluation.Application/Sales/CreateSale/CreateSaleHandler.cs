@@ -1,4 +1,6 @@
+using System.Linq;
 using Ambev.DeveloperEvaluation.Application.Sales;
+using Ambev.DeveloperEvaluation.Domain.Events;
 using Ambev.DeveloperEvaluation.Domain.Entities;
 using Ambev.DeveloperEvaluation.Domain.Repositories;
 using Ambev.DeveloperEvaluation.Domain.Services;
@@ -12,15 +14,18 @@ public class CreateSaleHandler : IRequestHandler<CreateSaleCommand, CreateSaleRe
 {
     private readonly ISaleRepository _saleRepository;
     private readonly ISaleLineDiscountCalculator _discountCalculator;
+    private readonly ISaleLifecycleEvents _saleLifecycleEvents;
     private readonly IMapper _mapper;
 
     public CreateSaleHandler(
         ISaleRepository saleRepository,
         ISaleLineDiscountCalculator discountCalculator,
+        ISaleLifecycleEvents saleLifecycleEvents,
         IMapper mapper)
     {
         _saleRepository = saleRepository;
         _discountCalculator = discountCalculator;
+        _saleLifecycleEvents = saleLifecycleEvents;
         _mapper = mapper;
     }
 
@@ -52,6 +57,13 @@ public class CreateSaleHandler : IRequestHandler<CreateSaleCommand, CreateSaleRe
         };
 
         var created = await _saleRepository.CreateAsync(sale, cancellationToken);
+        var now = DateTime.UtcNow;
+        _saleLifecycleEvents.SaleCreated(created.Id, created.SaleNumber, created.TotalAmount, now);
+        foreach (var line in command.Items.Where(i => i.IsCancelled))
+            _saleLifecycleEvents.ItemCancelled(created.Id, line.ProductId, line.ProductDescription, line.Quantity, now);
+        if (command.IsCancelled)
+            _saleLifecycleEvents.SaleCancelled(created.Id, created.SaleNumber, "SaleCreatedAsCancelled", now);
+
         return _mapper.Map<CreateSaleResult>(created);
     }
 }
