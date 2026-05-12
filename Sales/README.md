@@ -76,22 +76,87 @@ This section describes the overall structure and organization of the project fil
 
 See [Project Structure](/.doc/project-structure.md)
 
+## Implantar o sistema
+
+### Pré-requisitos
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [PostgreSQL](https://www.postgresql.org/) (local ou em contentor)
+- Opcional: [Docker Desktop](https://www.docker.com/products/docker-desktop/) para base de dados e/ou API em contentor
+
+### 1) Base de dados PostgreSQL
+- **Docker (repositório):** na pasta `Sales`, execute `docker compose up -d ambev.developerevaluation.database`. Credenciais por omissão estão em [`docker-compose.yml`](docker-compose.yml) (`developer_evaluation`, utilizador `developer`, palavra-passe definida no ficheiro).
+- **Connection string** alinhada a esse serviço (exemplo):  
+  `Host=localhost;Port=5432;Database=developer_evaluation;Username=developer;Password=<a_do_compose>`
+- Se a API correr **dentro da mesma rede Docker** que o Postgres, use como host o nome do serviço: `ambev.developerevaluation.database` em vez de `localhost`, e exponha a porta interna `5432`.
+
+### 2) Migrações (schema)
+Na pasta `Sales`:
+
+```bash
+dotnet ef database update --project src/Ambev.DeveloperEvaluation.ORM --startup-project src/Ambev.DeveloperEvaluation.WebApi
+```
+
+*(Requer a ferramenta EF: `dotnet tool install --global dotnet-ef` se ainda não tiver.)*
+
+### 3) Executar a API (desenvolvimento)
+```bash
+dotnet run --project src/Ambev.DeveloperEvaluation.WebApi/Ambev.DeveloperEvaluation.WebApi.csproj
+```
+- HTTP: `http://localhost:5119` — Swagger: `/swagger` (apenas com `ASPNETCORE_ENVIRONMENT=Development`).
+- HTTPS: ver [`launchSettings.json`](src/Ambev.DeveloperEvaluation.WebApi/Properties/launchSettings.json).
+
+Ajuste `ConnectionStrings:DefaultConnection` e bloco `Jwt` em `appsettings.Development.json` / variáveis de ambiente (`ConnectionStrings__DefaultConnection`, `Jwt__SecretKey`, etc.) conforme o ambiente.
+
+### 4) Imagem Docker da API (contentor só da WebApi)
+Na pasta **`Sales`** (contexto de build onde existe a pasta `src/`):
+
+```bash
+docker build -f src/Ambev.DeveloperEvaluation.WebApi/Dockerfile -t ambev-developer-evaluation-webapi:latest .
+```
+
+Ao correr o contentor, passe a connection string e JWT (ex.: `-e ConnectionStrings__DefaultConnection=...`, `-e Jwt__SecretKey=...`). O [`docker-compose.yml`](docker-compose.yml) inclui um serviço de exemplo `ambev.developerevaluation.webapi`; pode precisar de `depends_on` e da mesma connection string com host do serviço Postgres para um arranque completo automático.
+
+---
+
+## Testar o sistema
+
+### Testes automatizados (CI / local)
+Na pasta `Sales`:
+
+| Objetivo | Comando |
+|----------|---------|
+| Compilar | `dotnet build Sales.sln -c Release` |
+| Toda a suíte (unitários + integração HTTP + funcionais health) | `dotnet test Sales.sln -c Release` |
+| Cobertura mínima **81%** (linhas em **Domain** + **Application**) | `powershell -File ./scripts/verify-coverage.ps1` ou `dotnet test tests/Ambev.DeveloperEvaluation.Unit/Ambev.DeveloperEvaluation.Unit.csproj -c Release -p:RunCoverageAnalysis=true` |
+
+- **Unitários** — regras de domínio, handlers, segurança JWT, etc. (`tests/Ambev.DeveloperEvaluation.Unit`).
+- **Integração** — HTTP real contra a WebApi com SQLite em ficheiro temporário (`tests/Ambev.DeveloperEvaluation.Integration`).
+- **Funcionais** — health checks (`/health`, `/health/live`, `/health/ready`) com host de teste (`tests/Ambev.DeveloperEvaluation.Functional`).
+
+### Teste manual rápido (Swagger)
+1. Com a API em **Development** e a base migrada, abra `https://localhost:7181/swagger` ou `http://localhost:5119/swagger`.
+2. `POST /api/users` — registo (sem JWT).
+3. `POST /api/auth` — copie `data.token`.
+4. **Authorize** — cole o token (ou `eyJ...` apenas).
+5. Experimente `GET /api/sales`, `POST /api/sales`, etc.
+
+### Teste manual com HTTP (exemplo)
+```bash
+curl -s http://localhost:5119/health/live
+```
+
+Com JWT (substitua `<TOKEN>`):
+```bash
+curl -s -H "Authorization: Bearer <TOKEN>" "http://localhost:5119/api/sales?page=1&pageSize=10"
+```
+
 ## Local development (backend in this folder)
 
-- Open and build [`Sales.sln`](Sales.sln) at the root of this folder; source is under [`src/`](src/) and tests under [`tests/`](tests/).
-- Build: `dotnet build Sales.sln -c Release`
-- Tests: `dotnet test Sales.sln -c Release` (inclui unitários, integração HTTP e **funcionais** em `tests/Ambev.DeveloperEvaluation.Functional` — health checks da API).
-- **Cobertura mínima (81% linhas em Domain + Application):** na raiz da pasta Sales, execute `powershell -File ./scripts/verify-coverage.ps1` (ou `pwsh` no Linux/macOS) ou `dotnet test tests/Ambev.DeveloperEvaluation.Unit/Ambev.DeveloperEvaluation.Unit.csproj -c Release -p:RunCoverageAnalysis=true` (falha o build se estiver abaixo do limiar).
-- PostgreSQL local (exemplo com Docker Desktop):  
-  `docker run --name meu-postgres -e POSTGRES_PASSWORD=suasenha -p 5432:5432 -d postgres`  
-  Utilizador e base por omissão da imagem: `postgres` / `postgres`. A connection string em `appsettings.json` e `appsettings.Development.json` aponta para `localhost:5432` com essas credenciais. Para outra base, use `-e POSTGRES_DB=nome_da_base` e alinhe `Database=` na connection string.  
-  Alternativa do repositório: `docker compose up -d ambev.developerevaluation.database` (credenciais no `docker-compose.yml`).
-- Apply EF migrations (PostgreSQL):  
-  `dotnet ef database update --project src/Ambev.DeveloperEvaluation.ORM --startup-project src/Ambev.DeveloperEvaluation.WebApi`
-- Aplicação Sales (MediatR): `CreateSaleCommand`, `GetSaleCommand`, `ListSalesQuery`, `UpdateSaleCommand`, `DeleteSaleCommand` — totais e descontos por linha via `ISaleLineDiscountCalculator`.
-- **Paginação `GET /api/sales`:** `page` ≥ 1; `pageSize` entre **1 e 10000** (validação em `ListSalesQueryRequestValidator`, constantes em `SalesListPagination`). Se omitir a query string, usa-se **página 1** e **pageSize = 1000** por omissão.
-- **Autenticação:** `POST /api/users` (registo, anónimo) e `POST /api/auth` (JWT em `data.token`). Os endpoints de **Sales** e a maior parte de **Users** exigem cabeçalho `Authorization: Bearer <token>`; detalhes e exemplos em `/swagger` (Development).
-- Run API (Development): `dotnet run --project src/Ambev.DeveloperEvaluation.WebApi/Ambev.DeveloperEvaluation.WebApi.csproj` then open Swagger at `/swagger` (see `launchSettings.json` for ports).
+Resumo: **implantação e testes** detalhados estão nas secções [Implantar o sistema](#implantar-o-sistema) e [Testar o sistema](#testar-o-sistema) acima.
+
+- Abrir e compilar [`Sales.sln`](Sales.sln); código em [`src/`](src/), testes em [`tests/`](tests/).
+- PostgreSQL genérico (outro host/credenciais): ver também o bullet em [1) Base de dados](#1-base-de-dados-postgresql) ou `docker run` com imagem `postgres` conforme necessidade local.
+- **Autenticação:** JWT via `POST /api/auth` após `POST /api/users`; **paginação** `GET /api/sales`: `page` ≥ 1, `pageSize` 1–10000 (omissão → página 1 e tamanho 1000). Comandos MediatR: `CreateSaleCommand`, `GetSaleCommand`, `ListSalesQuery`, `UpdateSaleCommand`, `DeleteSaleCommand` com `ISaleLineDiscountCalculator`.
 
 **Sales HTTP API** (`SalesController`):
 
